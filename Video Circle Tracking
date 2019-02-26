@@ -4,28 +4,27 @@ import numpy as np
 
 
 # number of frames to skip
-numFrameToSave = 15
+numFrameToSave = 20
 
 
 # define the list of boundaries for color detection
 # ([Blue,Green,Red],[Blue,Green,Red])
 boundaries = [
-    ([26 , 61 , 147] , [46 , 81 , 167]),             # Color 1-Rose
-#    ([153, 63, 153], [173, 83, 173]),               # Color 2-Purple
-#    ([72 , 58 , 46] , [92 , 78 , 66]),             # Color 3-Light Grey
-#    ([0, 0, 0], [10, 10, 10]),                    # Color 4-Black
-#    ([165, 217, 229], [185, 237, 249]),             # Color 5-Light Yellow
-#    ([19, 219, 171], [39, 239, 191]),               # Color 6-Lime
-#    ([67, 167, 25], [87, 187, 45]),                 # Color 7-Green
-#    ([0 , 123 , 143] , [20 , 143 , 163]),                # Color 8-Yellow
-#    ([28, 117, 245], [48, 137, 255]),               # Color 9-Orange
-#    ([222, 153, 0], [242, 173, 10]),                # Color 10-Turquoise
-#    ([194, 61, 53], [214, 81, 73]),                 # Color 11-Indigo
-#    ([19 , 55 , 149] , [39 , 75 , 169])                  # Color 12-Red
+([108 , 95 , 141] , [138 , 125 , 171]),
+([74 , 18 , 69] , [104 , 48 , 99]),
+([63 , 51 , 41] , [93 , 81 , 71]),
+([92 , 122 , 127] , [122 , 152 , 157]),
+([12 , 14 , 139] , [42 , 44 , 169]),
+([18 , 62 , 0] , [48 , 92 , 25]),
+([0 , 119 , 139] , [26 , 149 , 169]),
+([17 , 53 , 147] , [47 , 83 , 177]),
+([128 , 56 , 0] , [158 , 86 , 26]),
+([95 , 22 , 0] , [125 , 52 , 24]),
+([0 , 108 , 70] , [27 , 138 , 100])
 ]
 
 #Names of the Colors
-colors = ['Rose', 'Purple', 'Light Grey', 'Light Yellow', 'Lime', 'Green', 'Yellow', 'Orange', 'Turqouise', 'Indigo', 'Red']
+colors = ['Rose', 'Purple', 'Light Grey', 'Light Yellow', 'Red', 'Green', 'Yellow', 'Orange', 'Turqouise', 'Indigo', 'Lime']
 
 # creates a list of 12 lists, one per circle
 centerPoints = [[] for i in range(12)]            
@@ -49,6 +48,13 @@ while success:                              # check success here might break you
     cv.imwrite("frame.jpg", image)          #Writes the current frame to frame.jpg
     image = cv.imread("frame.jpg")          #Reads the currenent frame------May be able to skip this step
     circleNum = 0
+    print('\n')
+    print('Frame Number:', count)
+    print('-----------------------')
+    
+  # allows a frame number to be saved in case there is something fishy going on
+    if count == 0:
+        cv.imwrite("TroubleShootFrame.jpg",image)
 
     # loop over the boundaries
     for (lower, upper) in boundaries:
@@ -71,7 +77,7 @@ while success:                              # check success here might break you
         gray = cv.cvtColor(src, cv.COLOR_BGR2GRAY)
         gray = cv.medianBlur(gray, 5)
         circles = cv.HoughCircles(gray, cv.HOUGH_GRADIENT, 1, 600, param1=200, param2=15,
-                                  minRadius=20, maxRadius=1000)
+                                  minRadius=20, maxRadius=200)
 
         circles = np.uint16(np.around(circles))
         
@@ -84,9 +90,10 @@ while success:                              # check success here might break you
         
         centerPoints[circleNum].append(center);
         
-        print(colors[circleNum],'\t\tCircles Found:', len(holder[:,0]))
+        print(colors[circleNum],'\t', )
         print(xcenter,ycenter)
-        circleNum = circleNum + 1;
+        print('Circles Found: ',len(holder[:,0]))
+        circleNum = circleNum + 1
         
 #        #Prints the color name and their center points
 #        for j in range(0, 11):
