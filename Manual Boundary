@@ -1,0 +1,54 @@
+# Set up how many times to run the scripts
+numberColors = int(input('Enter the Number of Colors: '))
+Range = int(input('Enter the Range: '))
+
+RedUpper = [0] * numberColors;
+RedLower = [0] * numberColors;
+GreenUpper = [0] * numberColors;
+GreenLower = [0] * numberColors;
+BlueUpper = [0] * numberColors;
+BlueLower = [0] * numberColors;
+
+for counter in range(0,numberColors):
+    
+    #Input the RGB Values and Range
+    Red = int(input('Red: '))
+    Green = int(input('Green: '))
+    Blue = int(input('Blue: '))
+    
+    #Find the upper and lower boundaries
+    RedUpper[counter] = Red + Range
+    RedLower[counter] = Red - Range
+    
+    if RedUpper[counter] > 255:
+        RedUpper[counter] = 255
+        RedLower[counter] = 255-Range*2
+    if RedLower[counter] < 0 :
+        RedLower[counter] = 0
+        RedUpper[counter] = 0 + Range*2
+    
+    GreenUpper[counter] = Green + Range
+    GreenLower[counter] = Green - Range
+    
+    if GreenUpper[counter] > 255:
+        GreenUpper[counter] = 255
+        GreenLower[counter] = 255 - Range*2
+    if GreenLower[counter] < 0 :
+        GreenLower[counter] = 0
+        GreenUpper[counter] = 0 +Range*2
+        
+    BlueUpper[counter] = Blue + Range
+    BlueLower[counter] = Blue - Range
+    
+    if BlueUpper[counter] > 255:
+        BlueUpper[counter] = 255
+        BlueLower[counter] = 255 - Range*2
+    if BlueLower[counter] < 0 :
+        BlueLower[counter] = 0
+        BlueUpper[counter] = 0 + Range*2
+    #Prints the Proper Format for detect_color
+
+print('[')
+for counter in range(0,numberColors):
+    print("([%d , %d , %d] , [%d , %d , %d])," % (BlueLower[counter] , GreenLower[counter] , RedLower[counter] , BlueUpper[counter] , GreenUpper[counter], RedUpper[counter]))
+print(']')
