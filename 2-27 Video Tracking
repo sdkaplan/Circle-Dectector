@@ -1,15 +1,21 @@
+#%%
 #Import the tools needed for the rest of the program
 import cv2 as cv
 import numpy as np
+import time
+import math
+import matplotlib as mathplotlib
+start_time = time.time()                # Times how long the program runs for 
 
+numFrameToSave = 30                     # Number of frames to skip [frames]
+camerafps = 30                          # Frames per second the camera shoots at [frames / second]
+interval = numFrameToSave / camerafps   # How many seconds apart are each of the inspected frames [seconds]
+conversion = 1080 / 20                  # PIXELS / UNITS    eg [pixels /  cm]
+units = 'cm'
 
-# number of frames to skip
-numFrameToSave = 20
-
-
-# define the list of boundaries for color detection
-# ([Blue,Green,Red],[Blue,Green,Red])
-boundaries = [
+#%% Sets up the Color Detection and data storage
+boundaries = [                          # define the list of boundaries for color detection
+                                        # ([Blue,Green,Red],[Blue,Green,Red])
 #([108 , 95 , 141] , [138 , 125 , 171]),
 #([74 , 18 , 69] , [104 , 48 , 99]),
 #([63 , 51 , 41] , [93 , 81 , 71]),
@@ -25,20 +31,22 @@ boundaries = [
 ]
 
 #Names of the Colors
-colors = ['Rose', 'Purple', 'Light Grey', 'Light Yellow', 'Red', 'Green', 'Yellow', 'Orange', 'Turqouise', 'Indigo', 'Lime']
+colors = ['Rose', 'Purple', 'Light Grey', 'Light Yellow', 'Red', 'Green',
+          'Yellow', 'Orange', 'Turqouise', 'Indigo', 'Lime']
 
-# creates a list of 12 lists, one per circle
-centerPoints = [[] for i in range(12)]            
+centerPoints = [[] for i in range(12)]              #Creates list of list to store location of centerpoint the 12 is How many circles we have         
+RadList = [];                                       #Creates list to store length of radius 
 
-
-#Imports the Video and reads the file 
-vidcap = cv.VideoCapture('MovingTest1Circle.mov')
+vidcap = cv.VideoCapture('MovingTest1Circle.mov')   #Imports the Video and reads the file 
 success,image = vidcap.read()
-count = 0;
-
 print("I am in success")
-while success:                              # check success here might break your program
-  success,image = vidcap.read()             #success might be false and image might be None
+
+indexcounter = 0                                    #Index counter is so we can access the previous location to calculate the speed
+count = 0;                                          #Count to determine what frames to skip
+
+#%%
+while success:                                      # check success here might break your program
+  success,image = vidcap.read()                     #success might be false and image might be None
   
   #check success here
   if not success:
@@ -46,17 +54,18 @@ while success:                              # check success here might break you
 
   # on every numFrameToSave
   if (count % numFrameToSave == 0):
-    cv.imwrite("frame.jpg", image)          #Writes the current frame to frame.jpg
-    image = cv.imread("frame.jpg")          #Reads the currenent frame------May be able to skip this step
+    cv.imwrite("frame.jpg", image)                  #Writes the current frame to frame.jpg
+    image = cv.imread("frame.jpg")                  #Reads the currenent frame------May be able to skip this step
     circleNum = 0
     print('\n')
     print('Frame Number:', count)
     print('-----------------------')
     
   # allows a frame number to be saved in case there is something fishy going on
-    if count == 280:
+    if count == 300:
         cv.imwrite("TroubleShootFrame.jpg",image)
 
+#%%
     # loop over the boundaries
     for (lower, upper) in boundaries:
         # create NumPy arrays from the boundaries
@@ -65,41 +74,96 @@ while success:                              # check success here might break you
             
         # find the colors within the specified boundaries and apply
         # the mask
-        mask = cv.inRange(image, lower, upper)
-        output = cv.bitwise_and(image, image, mask=mask)
+        mask = cv.inRange(image, lower, upper)  #Creates the mask to apply over the color boundary
+        output = cv.bitwise_and(image, image, mask=mask)    #combines the mask and the original image and saves as output
             
-        # cv.imshow("images",output)
-        # #Shows what the output of the boundary is
         cv.imwrite('temp.png', output)          # Saves the output as a temp.png
         filename = "temp.png"                   # Loads the temp.png as 'filename' to be used for Hough
             
+#%%
         # Hough transform
         src = cv.imread(filename, cv.IMREAD_COLOR)  # Reads the file name and stores it as src in Color
         gray = cv.cvtColor(src, cv.COLOR_BGR2GRAY)  # Converts the src to a gray scale picture for the Hough Transform
         gray = cv.medianBlur(gray, 5)
-        circles = cv.HoughCircles(gray, cv.HOUGH_GRADIENT, 1, 10000, param1=200, param2=15,
-                                  minRadius=20, maxRadius=2000)
+        circles = cv.HoughCircles(gray, cv.HOUGH_GRADIENT, 3, 10000, param1=300, param2=15,
+                                  minRadius=100, maxRadius=200)
 
+#%% If we find a Circle        
         if circles is not None: 
-            circles = np.uint16(np.around(circles))
+            circles = np.uint16(np.around(circles))     
         # Converts the output of Hough Transform into the data we want
-            holder = circles[0,:]                               #Stores circles in a placeholding variable        
-            xcenter = holder[:,0];                         # The x-center
-            ycenter = holder[:,1];                         # The y-center
-            radius = holder[:,2];                          # The radius (Not sure why, but why not)
+            holder = circles[0,:]                                                 #Stores circles in a placeholding variable in [pixels]   
+            xcenter = int(holder[:,0]) / conversion;                              # The x-center in [cm]
+            ycenter = int(holder[:,1]) / conversion;                              # The y-center in [cm]
+            radius = int(holder[:,2]) / conversion;                               # The radius (Not sure why, but why not) in [cm]
             center = [xcenter,ycenter];                         
             centerPoints[circleNum].append(center);
-            
-            print(colors[circleNum],'\t', )
-            print(xcenter,ycenter)
-            print('Radius: ', radius)
-            print('Circles Found: ',len(holder[:,0]))
-        else:                                                                   #If it is unable to find any circles 
-            print('No circles found!')
         
+        # Calculates the speed of the object over the last time interval
+            if len(centerPoints[0]) >= 1:
+                previousLocation = (centerPoints[circleNum])[indexcounter - 1]
+                xprevious = previousLocation[0]
+                yprevious = previousLocation[1]
+                distance = math.sqrt((xcenter - xprevious)**2 + (ycenter - yprevious)**2)      # Distance the circle traveled in [cm]
+                speed = distance / interval
 
-        circleNum = circleNum + 1
-               
+#%% If we dont find a circle
+# Uses the information from the previous location found: Could add that it 'guesses the location' based on previous speed
+# Next generation could use a kalman filter
+        else:
+            previousLocation = (centerPoints[circleNum])[indexcounter - 1]      # If the program does not detect a circle, it uses the last data point and stores that as the center
+            xcenter = previousLocation[0]
+            ycenter = previousLocation[1]
+            raidus = 0
+            distance = 0
+            speed = 0
+            center = [xcenter,ycenter]
+            centerPoints[circleNum].append(center)
+        
+        
+#%% Regardless of circle or not
+        # Prints the Relevant information so we know it isn't too messed up
+        print(colors[circleNum],'\t', )
+        print('%.2f, %.2f %s' % (xcenter,ycenter,units))
+        print('Previous %.2f %.2f %s' % (xprevious,yprevious,units))
+        print('Radius: %.2f %s' % (radius,units))
+        print('Distance %.2f %s' % (distance,units))
+        print('Circles Found: ',len(holder[:,0]))
+        print('Speed: %.2f %s / second' % (speed,units))
+        RadList.append(radius)
+        
+        
+        circleNum = circleNum + 1               # Circle number loops over the boundaries to change what number circle is being identified
+    indexcounter = indexcounter + 1             # Should be outside of the for loop in boundaries changes what number picture we are looking at count / numberofframestoskip
+#%%
   if cv.waitKey(10) == 27:
       break
+
   count += 1
+
+  
+#%% What to do at the end of the program
+print('\n\n\n')
+print('Time Ellapsed: %.2f seconds' % (time.time()-start_time))
+
+#%% Prompt to graph the scatter plots of the circles
+answer = str(input('Do you wish to Plot the graphs y/n: '))
+number_of_colors = len(boundaries)
+
+if answer == 'y':
+    dataPoints = len(centerPoints[0])
+
+    xValues = np.zeros((number_of_colors,dataPoints))
+    yValues = np.zeros((number_of_colors,dataPoints))
+    index = 0;
+
+    for counter1 in range(number_of_colors):
+        for counter2 in range(dataPoints):
+            xValues[counter1][counter2] = ((centerPoints[counter1])[counter2])[0]
+            yValues[counter1][counter2] = ((centerPoints[counter1])[counter2])[1]
+            
+        title = colors[counter1]
+        mathplotlib.pyplot.plot(xValues[0],yValues[0],'-o')
+        mathplotlib.pyplot.title(title)
+        mathplotlib.pyplot.xlim((0,30))
+        mathplotlib.pyplot.ylim((0,30))
