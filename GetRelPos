@@ -1,0 +1,47 @@
+import numpy as np
+import math
+
+
+def getRelPos(positions):
+    # positions is a list of 12 tuples that are the positions at the given time
+
+    relDistance = [[] for i in positions]
+    # print(relDistance)
+
+    count = 0
+    for pos in positions:
+        # The position of the main circle
+        x = pos[0]
+        y = pos[1]
+
+        for compare in positions:
+            # the position of the coord comparing too
+            xTemp = compare[0]
+            yTemp = compare[1]
+
+            xDist = x - xTemp
+            yDist = y - yTemp
+            dist = math.sqrt(float(xDist) ** 2 + float(yDist) ** 2)
+            dist = round(dist, 2)
+            relDistance[count].append(dist)
+        count = count + 1
+    # print(relDistance)
+    return relDistance
+
+
+def main():
+    positions = [(10, 10), (12, 15), (5, 3), (1, 6)]
+    relPos = getRelPos(positions)
+
+    count1 = 1
+    for distances in relPos:
+        count2 = 1
+        for j in distances:
+            print("circle " + str(count1) + " is " + str(j) + '  pixel distance from circle ' + str(count2))
+            count2 = count2 + 1
+        print()
+        count1 = count1 + 1
+    print(relPos)
+
+if __name__ == "__main__":
+    main()
