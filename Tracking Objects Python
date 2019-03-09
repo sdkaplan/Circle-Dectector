@@ -1,0 +1,262 @@
+"""
+Tracking Swarm Robots
+Created Late at Night on Fri Mar  8 12:42:57 2019
+@author: M.R.Bonthron
+Illinois Institute of Technology
+"""
+#%% Import the tools needed for the rest of the program
+import cv2 as cv
+import numpy as np
+import time
+import math
+import matplotlib as mathplotlib
+
+start_time = time.time()                # Times how long the program runs for 
+numFrameToSave = 1                     # Number of frames to skip [frames]
+camerafps = 30                          # Frames per second the camera shoots at [frames / second]
+interval = numFrameToSave / camerafps   # How many seconds apart are each of the inspected frames [seconds]
+conversion = 1080 / 1080                  # PIXELS / UNITS    eg [pixels /  cm]
+units = 'pixels'
+number_of_objects = 1
+device_number = 0 
+Range = 30
+
+# Creats array to store information about the RGB values 
+RedInput = []
+GreenInput = []
+BlueInput = []
+
+RedUpper = [0] * number_of_objects;
+RedLower = [0] * number_of_objects;
+GreenUpper = [0] * number_of_objects;
+GreenLower = [0] * number_of_objects;
+BlueUpper = [0] * number_of_objects;
+BlueLower = [0] * number_of_objects;
+#%% Opens Web Camera to get initial conditions
+#Sets the size of the color window
+COLOR_ROWS = 80
+COLOR_COLS = 250
+#Opens the camera
+capture = cv.VideoCapture(device_number)
+
+# Uses frame to set up the display from snapshot
+(grabbed, frame) = capture.read()
+snapshot = np.zeros(frame.shape, dtype=np.uint8)
+
+#Displays the snapshot window
+cv.imshow('Snapshot', snapshot)
+
+colorArray = np.zeros((COLOR_ROWS, COLOR_COLS, 3), dtype=np.uint8)
+cv.imshow('Color', colorArray)
+
+#Function that occurs when the mouse is clicked
+def on_mouse_click(event, x, y, flags, userParams):
+    if event == cv.EVENT_LBUTTONDOWN:
+        colorArray[:] = snapshot[y, x, :]
+        rgb = snapshot[y, x, [2,1,0]]
+        
+#Makes the color window all pretty looking        
+        # From stackoverflow/com/questions/1855884/determine-font-color-based-on-background-color
+        luminance = 1 - (0.299*rgb[0] + 0.587*rgb[1] + 0.114*rgb[2]) / 255
+        if luminance < 0.5:
+            textColor = [0,0,0]
+        else:
+            textColor = [255,255,255]
+
+        cv.putText(colorArray, str(rgb), (20, COLOR_ROWS - 20),
+            fontFace=cv.FONT_HERSHEY_SIMPLEX, fontScale=0.8, color=textColor)
+        cv.imshow('Color', colorArray)
+
+#Links the callback function to the snapshot window        
+cv.setMouseCallback('Snapshot', on_mouse_click)
+
+#Shows the webcam feed
+while True:
+    (grabbed, frame) = capture.read()
+    cv.imshow('Video', frame)
+
+    if not grabbed:
+        break
+
+    keyVal = cv.waitKey(1) & 0xFF
+    if keyVal == ord('q'):
+        break
+    elif keyVal == ord('s'):
+        RedInput.append(((colorArray[0])[0])[2])
+        GreenInput.append(((colorArray[0])[0])[1])
+        BlueInput.append(((colorArray[0])[0])[0])
+    elif keyVal == ord('t'):
+        snapshot = frame.copy()
+        cv.imshow('Snapshot', snapshot)
+        
+#Releases the Webcam and destroys the windows
+capture.release()
+cv.destroyAllWindows()
+#%% Sets up the Color Detection and data storage
+#Names of the Colors
+colors = ['Object 1','Object 2','Object 3','Object 4','Object 5','Object 6','Object 7','Object 8','Object 9','Object 10','Object 11','Object 12',]
+
+# define the list of boundaries for color detection
+# ([Blue,Green,Red],[Blue,Green,Red])
+boundaries =[]
+
+#Sets up empty list to store center values 
+centerPoints = [[] for i in range(number_of_objects)]         
+
+for counter in range(0,number_of_objects):
+    RedUpper = RedInput[counter] + Range
+    RedLower = RedInput[counter] - Range
+    
+    if RedUpper > 255:
+        RedUpper = 255
+        RedLower = 255-Range*2
+    if RedLower < 0:
+        RedLower = 0
+        RedUpper = 0+Range*2
+    
+    GreenUpper = GreenInput[counter] + Range
+    GreenLower = GreenInput[counter] - Range
+    
+    if GreenUpper > 255:
+        GreenUpper = 255
+        GreenLower = 255-Range*2
+    if GreenLower < 0:
+        GreenLower = 0
+        GreenUpper = 0+Range*2
+        
+    BlueUpper = BlueInput[counter] + Range
+    BlueLower = BlueInput[counter] - Range
+    
+    if BlueUpper > 255:
+        BlueUpper = 255
+        BlueLower = 255-Range*2
+    if RedLower < 0:
+        BlueLower = 0
+        BlueUpper = 0+Range*2
+    
+    boundaries.append(([BlueLower,GreenLower,RedLower], [BlueUpper,GreenUpper,RedUpper]))
+
+#%% Acesses the webcam
+#Imports the Video as a webcam
+vidcap = cv.VideoCapture(device_number)
+cv.namedWindow("Web Cam")
+    
+for i in range(1,number_of_objects):
+    cv.namedWindow("Filter %s" % i)
+
+#%% Inserts the counters                          
+indexcounter = 0                                    #Index counter is so we can access the previous location to calculate the speed
+framenumber = 0
+
+#%% Accesses the webcam 
+if vidcap.isOpened(): # try to get the first frame
+    rval, image = vidcap.read()
+else:
+    rval = False
+#%% While it is able to access the webcam successfully
+while rval:
+    cv.imshow("Web Cam", image)
+    rval, image = vidcap.read()
+    
+    if (framenumber % numFrameToSave == 0):
+        objectNum = 0
+        print('\nFrameNumber:',framenumber)
+        print('-------------------------')
+        
+# Loop over the boundaries: Looking for each color in boundaries 
+        for (lower, upper) in boundaries:
+            lower = np.array(lower, dtype="uint8")
+            upper = np.array(upper, dtype="uint8")
+            
+# find the colors within the specified boundaries and apply the mask
+            mask = cv.inRange(image, lower, upper)              
+            output = cv.bitwise_and(image, image, mask=mask)
+               
+            cv.imwrite('temp.png',output)
+            filename = "temp.png" 
+            
+# Shows the what the filter has applied to determine Hough 
+            if objectNum == 0:
+                cv.imshow("Filter 1",output)
+            elif objectNum == 1:
+                cv.imshow("Filter 2",output)
+            
+#%% Finds the centroid of the pixels of a certain color
+            src = cv.imread(filename, cv.IMREAD_COLOR)  # Reads the file name and stores it as src in Color
+            gray = cv.cvtColor(src, cv.COLOR_BGR2GRAY)  # Converts the src to a gray scale picture for the threshold change to calculate the centroid
+            
+            ret,thresh = cv.threshold(gray ,50 ,255, 0) #Applied the threshold to set pixels either as white or as black
+            
+            M = cv.moments(thresh)  #Determines the centroid of only the white images pixels
+            
+# If a cenroid is found
+            if M["m00"] != 0.0 :
+                xcenter = int(M["m10"] / M["m00"])
+                ycenter = int(M["m01"] / M["m00"])
+# If no centroid is found, but there is information from previous data
+            elif len(centerPoints[objectNum]) >= 1:
+                previousLocation = (centerPoints[objectNum])[indexcounter - 1]
+                xcenter = previousLocation[0]
+                ycenter = previousLocation[1]
+# If no centroid is found and there is no information from previous data
+            else:
+                xcenter = 0
+                ycenter = 0
+
+#%% Storing the center data        
+            center = [xcenter,ycenter]                         
+            centerPoints[objectNum].append(center)
+
+# Calculates the speed of the object over the last time interval if there has been more than 1 data point collected
+            if len(centerPoints[objectNum]) >= 1:
+                previousLocation = (centerPoints[objectNum])[indexcounter - 1]
+                xprevious = previousLocation[0]
+                yprevious = previousLocation[1]
+                distance = math.sqrt((xcenter - xprevious)**2 + (ycenter - yprevious)**2)      # Distance the circle traveled in [cm]
+                speed = distance / interval
+                    
+                
+#%% Prints the information in the console to see
+            print(colors[objectNum],'\t', )
+            print('%.2f, %.2f %s' % (xcenter,ycenter,units))
+            print('Previous %.2f %.2f %s' % (xprevious,yprevious,units))
+            print('Distance %.2f %s' % (distance,units))
+            print('Speed: %.2f %s / second' % (speed,units))
+            
+        
+            objectNum = objectNum + 1               # Circle number loops over the boundaries to change what number circle is being identified
+        indexcounter = indexcounter + 1          # Should be outside of the for loop in boundaries changes what number picture we are looking at count / numberofframestoskip
+#%% Determines how many frames the camera has captured so far     
+    framenumber = framenumber +1
+#%% How to exit the code    
+    key = cv.waitKey(20)
+    if key == ord('q') : # exit on ESC
+        break
+#%% End of code release the camera     
+vidcap.release()
+cv.destroyAllWindows()
+
+print('\n\n\n')
+print('Time Ellapsed: %.2f seconds' % (time.time()-start_time))
+
+#%% Prompt to graph the scatter plots of the circles
+answer = str(input('Do you wish to Plot the graphs y/n: '))
+number_of_colors = len(boundaries)
+
+if answer == 'y':
+    dataPoints = len(centerPoints[0])
+
+    xValues = np.zeros((number_of_colors,dataPoints))
+    yValues = np.zeros((number_of_colors,dataPoints))
+    index = 0;
+
+    for counter1 in range(number_of_colors):
+        for counter2 in range(dataPoints):
+            xValues[counter1][counter2] = ((centerPoints[counter1])[counter2])[0]
+            yValues[counter1][counter2] = ((centerPoints[counter1])[counter2])[1]
+            
+        title = colors[counter1]
+        mathplotlib.pyplot.plot(xValues[0],yValues[0],'-o')
+        mathplotlib.pyplot.title(title)
+        mathplotlib.pyplot.xlim((0,30))
+        mathplotlib.pyplot.ylim((0,30))
