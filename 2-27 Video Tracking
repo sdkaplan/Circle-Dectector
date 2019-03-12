@@ -11,13 +11,13 @@ import time
 import math
 import matplotlib as mathplotlib
 
-start_time = time.time()                # Times how long the program runs for 
-numFrameToSave = 30                     # Number of frames to skip [frames]
+#start_time = time.time()                # Times how long the program runs for 
+numFrameToSave = 1                     # Number of frames to skip [frames]
 camerafps = 30                          # Frames per second the camera shoots at [frames / second]
 interval = numFrameToSave / camerafps   # How many seconds apart are each of the inspected frames [seconds]
 conversion = 1080 / 1080                  # PIXELS / UNITS    eg [pixels /  cm]
 units = 'pixels'
-number_of_objects = 1
+number_of_objects = 12
 device_number = 0 
 Range = 20
 
@@ -26,12 +26,12 @@ RedInput = []
 GreenInput = []
 BlueInput = []
 
-RedUpper = [0] * number_of_objects;
-RedLower = [0] * number_of_objects;
-GreenUpper = [0] * number_of_objects;
-GreenLower = [0] * number_of_objects;
-BlueUpper = [0] * number_of_objects;
-BlueLower = [0] * number_of_objects;
+RedUpper = [0] * number_of_objects
+RedLower = [0] * number_of_objects
+GreenUpper = [0] * number_of_objects
+GreenLower = [0] * number_of_objects
+BlueUpper = [0] * number_of_objects
+BlueLower = [0] * number_of_objects
 #%% Opens Web Camera to get initial conditions
 #Sets the size of the color window`
 COLOR_ROWS = 80
@@ -148,7 +148,9 @@ for counter in range(0,number_of_objects):
 #Imports the Video as a webcam
 vidcap = cv.VideoCapture(device_number)
 cv.namedWindow("Web Cam")
-    
+
+start_time = time.time()                # Times how long the program runs for     
+
 for i in range(1,number_of_objects):
     cv.namedWindow("Object %s" % str(i + 1))
 
@@ -159,12 +161,15 @@ framenumber = 0
 #%% Accesses the webcam 
 if vidcap.isOpened(): # try to get the first frame
     rval, image = vidcap.read()
+    width = int(vidcap.get(3))
+    height = int(vidcap.get(4))
 else:
     rval = False
 #%% While it is able to access the webcam successfully
 while rval:
+    framestart = time.time()
     cv.imshow("Web Cam", image)
-    rval, image = vidcap.read()
+    rval, image = vidcap.read() 
     
     if (framenumber % numFrameToSave == 0):
         objectNum = 0
@@ -179,18 +184,15 @@ while rval:
 # find the colors within the specified boundaries and apply the mask
             mask = cv.inRange(image, lower, upper)              
             output = cv.bitwise_and(image, image, mask=mask)
-               
-            cv.imwrite('temp.png',output)
-            filename = "temp.png" 
-            
+                           
 # Shows what each filter is picking up to apply centroid calculation
-            for window_num in range(0,number_of_objects):
-                if window_num == objectNum:
-                    cv.imshow("Object %s" % str(window_num + 1), output)
+#            for window_num in range(0,number_of_objects):
+#                if window_num == objectNum:
+#                    cv.imshow("Object %s" % str(window_num + 1), output)
             
 #%% Finds the centroid of the pixels of a certain color
-            src = cv.imread(filename, cv.IMREAD_COLOR)  # Reads the file name and stores it as src in Color
-            gray = cv.cvtColor(src, cv.COLOR_BGR2GRAY)  # Converts the src to a gray scale picture for the threshold change to calculate the centroid
+#            src = cv.imread(output, cv.IMREAD_COLOR)  # Reads the file name and stores it as src in Color
+            gray = cv.cvtColor(output, cv.COLOR_BGR2GRAY)  # Converts the src to a gray scale picture for the threshold change to calculate the centroid
             
             ret,thresh = cv.threshold(gray ,50 ,255, 0) #Applied the threshold to set pixels either as white or as black
             
@@ -222,17 +224,17 @@ while rval:
                 distance = math.sqrt((xcenter - xprevious)**2 + (ycenter - yprevious)**2)      # Distance the circle traveled in [cm]
                 speed = distance / interval
                     
-                
 #%% Prints the information in the console to see
-            print(colors[objectNum],'\t', )
+            print('\n',colors[objectNum])
             print('%.2f, %.2f %s' % (xcenter,ycenter,units))
             print('Previous %.2f %.2f %s' % (xprevious,yprevious,units))
             print('Distance %.2f %s' % (distance,units))
             print('Speed: %.2f %s / second' % (speed,units))
-            
         
             objectNum = objectNum + 1               # Circle number loops over the boundaries to change what number circle is being identified
         indexcounter = indexcounter + 1          # Should be outside of the for loop in boundaries changes what number picture we are looking at count / numberofframestoskip
+    frameend = time.time()
+    print('Frame Time: %f' % int(framestart-frameend))
 #%% Determines how many frames the camera has captured so far     
     framenumber = framenumber +1
     
@@ -262,8 +264,9 @@ if answer == 'y':
             xValues[counter1][counter2] = ((centerPoints[counter1])[counter2])[0]
             yValues[counter1][counter2] = ((centerPoints[counter1])[counter2])[1]
             
+        
         title = colors[counter1]
-        mathplotlib.pyplot.plot(xValues[0],yValues[0],'-o')
+        mathplotlib.pyplot.plot(xValues[counter1],yValues[counter1],'-o')
         mathplotlib.pyplot.title(title)
-        mathplotlib.pyplot.xlim((0,600))
-        mathplotlib.pyplot.ylim((0,600))
+        mathplotlib.pyplot.xlim((0,width))
+        mathplotlib.pyplot.ylim((0,height))
