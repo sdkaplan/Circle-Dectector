@@ -36,59 +36,49 @@ def getRelPos(positions):
 
 def main():
 
-    conversion = 1080 / 20  # PIXELS / UNITS    eg [pixels /  cm]
+    # to do:
+    #   buy camera
+    #   set up camera
+    #   implement conversion
+    #   implement getRelPos (is there a way to check if it is accurate? Maybe once conversion is set up?)
+    #   find more distinct colors to use (light vs dark for HSV sat levels? It works with dark and light pink)
+    #   Calculate velocity and relative velocity
+    #   How do we want to store the data? Is this where ROS comes in?
 
-    # construct the argument parse and parse the arguments
-    ap = argparse.ArgumentParser()
-    ap.add_argument("-v", "--video",
-                    help="path to the (optional) video file")
-    ap.add_argument("-b", "--buffer", type=int, default=64,
-                    help="max buffer size")
-    args = vars(ap.parse_args())
+    # conversion hasn't been implemented yet
+    conversion = 1080 / 20  # PIXELS / UNITS    eg [pixels /  cm
 
     # define the lower and upper boundaries of the colors in the HSV color space
-    lower = {'dark pink': (137, 91, 0), 'green': (43, 56, 132), 'blue': (105, 56, 75), 'yellow': (17, 72, 190),
-             'orange': (0, 125, 189), 'brown': (0, 82, 47), 'light pink': (132, 14, 132)}  # assign new item lower['blue'] = (93, 10, 0)
+    lower = {'dark pink': (137, 91, 0), 'green': (43, 56, 95), 'blue': (105, 56, 75), 'yellow': (0, 102, 142),
+             'orange': (0, 164, 138), 'brown': (0, 41, 47), 'light pink': (132, 14, 132)}
 
-    upper = {'dark pink': (191, 178, 221), 'green': (102, 255, 255), 'blue': (134, 255, 255), 'yellow': (56, 144, 226),
-             'orange': (34, 243, 235), 'brown': (62, 142, 58), 'light pink': (191, 95, 255)}
+    upper = {'dark pink': (191, 178, 221), 'green': (94, 255, 255), 'blue': (134, 255, 255), 'yellow': (255, 149, 255),
+             'orange': (255, 255, 255), 'brown': (18, 190, 106), 'light pink': (191, 90, 255)}
 
-    # define standard colors for circle around the object
+    # define standard colors for printed circle around the object
     colors = {'dark pink': (0, 0, 255), 'green': (0, 255, 0), 'blue': (255, 0, 0), 'yellow': (0, 255, 217),
-              'orange': (0, 140, 255), 'brown': (255, 192, 203), 'light pink': (255, 192, 203)}
+              'orange': (0, 140, 255), 'brown': (101, 67, 33), 'light pink': (255, 192, 203)}
 
+    # An array to hold the center points of each color
     # centerPoints = [[] for i in range(12)]
-    centerPoints = {'red': [] }
+    centerPoints = {'dark pink': [] }
         # , 'green': [], 'blue': [], 'yellow': [], 'orange': [], 'purple': [], 'pink': []}
+    
 
-    # pts = deque(maxlen=args["buffer"])
+    # grab the reference to the camera
+    camera = cv2.VideoCapture(1)  # IMPORTANT: 0 for default webcam, 1 for usb webcam
+    print("video received")
 
-    # if a video path was not supplied, grab the reference
-    # to the webcam
-    if not args.get("video", False):
-        camera = cv2.VideoCapture(1)  # IMPORTANT: 0 for default webcam, 1 for usb webcam
-        print("video received")
-
-    # otherwise, grab a reference to the video file
-    # else:
-    #     camera = cv2.VideoCapture(args["video"])
-    # keep looping
     while True:
         # grab the current frame
         (grabbed, frame) = camera.read()
-        # if we are viewing a video and we did not grab a frame,
-        # then we have reached the end of the video
+        # if we are viewing a video and we did not grab a frame, then we have reached the end of the video
         if not grabbed:
             break
 
-        # IP webcam image stream
-        # URL = 'http://10.254.254.102:8080/shot.jpg'
-        # urllib.urlretrieve(URL, 'shot1.jpg')
-        # frame = cv2.imread('shot1.jpg')
-
         # resize the frame, blur it, and convert it to the HSV
         # color space
-        frame = imutils.resize(frame, width=600)
+        frame = imutils.resize(frame, width=1000)
 
         blurred = cv2.GaussianBlur(frame, (11, 11), 0)
         hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
@@ -105,8 +95,7 @@ def main():
             # find contours in the mask and initialize the current
             # (x, y) center of the ball
             cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
-            center = None
-            # cnts = cv2.HoughCircles(mask.copy(), cv2.HOUGH_GRADIENT, 1, 150, param1=190, param2=15, minRadius=200, maxRadius=250)
+            # center = None
 
             # only proceed if at least one contour was found
             if len(cnts) > 0:
@@ -119,19 +108,20 @@ def main():
                 center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
                 # print(radius)
 
-                # only proceed if the radius meets a minimum size. Correct this value for your object's size
-                if radius > 20 and radius < 35:
+                # if the radius is between 40 and 60 pixels (current size about 50)
+                # removes noise from larger blobs that may appear
+                if 40 < radius < 60:
                     # draw the circle and centroid on the frame,
                     # then update the list of tracked points
                     cv2.circle(frame, (int(x), int(y)), int(radius), colors[key], 2)
                     cv2.putText(frame, key + " ball", (int(x - radius), int(y - radius)), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
                                 colors[key], 2)
+                    # centerPoints[key].append(center)
+                    # print(centerPoints)
 
-                    xcenter = int(x) / conversion  # The x-center in [cm]
-                    ycenter = int(y) / conversion  # The y-center in [cm]
-                    radius_con = radius / conversion  # The radius (Not sure why, but why not) in [cm]
-                    #centerPoints[key].append(center)
-                    #print(centerPoints)
+                    x_cm = int(x) / conversion  # The x-center in [cm]
+                    y_cm = int(y) / conversion  # The y-center in [cm]
+                    r_cm = radius / conversion  # The radius (Not sure why, but why not) in [cm]
 
                     # # Calculates the speed of the object over the last time interval
                     # if len(centerPoints[0]) >= 1:
