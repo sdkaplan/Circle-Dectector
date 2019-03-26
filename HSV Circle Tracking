@@ -1,12 +1,13 @@
 # import the necessary packages
 import numpy as np
-import argparse
 import imutils
 import cv2
 import math
+import time
 
 
 # given an array of positions at a given moment in time, return an array of the relative distances between them
+# doesn't work 3/26/19
 def getRelPos(positions):
     # positions is a list of 12 tuples that are the positions at the given time
 
@@ -18,19 +19,25 @@ def getRelPos(positions):
         # The position of the main circle
         x = pos[0]
         y = pos[1]
+        count = 0
+        for pos in positions:
+            # The position of the main circle
+            x = pos[0]
+            y = pos[1]
+            for compare in positions:
+                # the position of the coord comparing too
+                xtemp = compare[0]
+                ytemp = compare[1]
+                if (xtemp, ytemp) == (0, 0) or (x, y) == (0, 0):
+                    dist = 10000
+                else:
+                    xdist = x - xtemp
+                    ydist = y - ytemp
+                    dist = math.sqrt(float(xdist) ** 2 + float(ydist) ** 2)
+                    dist = round(dist, 2)
 
-        for compare in positions:
-            # the position of the coord comparing too
-            xtemp = compare[0]
-            ytemp = compare[1]
-
-            xdist = x - xtemp
-            ydist = y - ytemp
-            dist = math.sqrt(float(xdist) ** 2 + float(ydist) ** 2)
-            dist = round(dist, 2)
-            rel_distance[count].append(dist)  # units: pixels, change to cm or mm later
-        count = count + 1
-    # print(relDistance)
+                rel_distance[count].append(dist)  # units: pixels, change to cm or mm later
+            count = count + 1
     return rel_distance
 
 
@@ -44,29 +51,85 @@ def main():
     #   find more distinct colors to use (light vs dark for HSV sat levels? It works with dark and light pink)
     #   Calculate velocity and relative velocity
     #   How do we want to store the data? Is this where ROS comes in?
+    #               answer from Amman: Yes
 
     # conversion hasn't been implemented yet
-    conversion = 1080 / 20  # PIXELS / UNITS    eg [pixels /  cm
+    conversion = 1080 / 20  # PIXELS / UNITS    eg [pixels /  cm]
 
-    # define the lower and upper boundaries of the colors in the HSV color space
-    lower = {'dark pink': (137, 91, 0), 'green': (43, 56, 95), 'blue': (105, 56, 75), 'yellow': (0, 102, 142),
-             'orange': (0, 164, 138), 'brown': (0, 41, 47), 'light pink': (132, 14, 132)}
+    time0 = time.time()
 
-    upper = {'dark pink': (191, 178, 221), 'green': (94, 255, 255), 'blue': (134, 255, 255), 'yellow': (255, 149, 255),
-             'orange': (255, 255, 255), 'brown': (18, 190, 106), 'light pink': (191, 90, 255)}
+    shades_open = True
+    if shades_open:  # the values for orange and yellow are slightly different, it recognizes more background as blue
+
+        # define the lower and upper boundaries of the colors in the HSV color space
+        lower = {'dark pink': (137, 91, 0),
+                 'green': (43, 56, 2    5),
+                 'blue': (105, 56, 75),
+                 'yellow': (0, 88, 130),
+                 'orange': (0, 88, 85),
+                 'brown': (0, 41, 47),
+                 'light pink': (132, 14, 132)}
+
+        upper = {'dark pink': (255, 255, 255),
+                 'green': (94, 255, 255),
+                 'blue': (134, 255, 255),
+                 'yellow': (136, 165, 255),
+                 'orange': (20, 255, 255),
+                 'brown': (18, 190, 106),
+                 'light pink': (191, 90, 255)}
+
+    else:
+        # define the lower and upper boundaries of the colors in the HSV color space
+        lower = {'dark pink': (137, 91, 0),
+                 'green': (43, 56, 95),
+                 'blue': (105, 56, 75),
+                 'yellow': (0, 102, 142),
+                 'orange': (0, 164, 138),
+                 'brown': (0, 41, 47),
+                 'light pink': (132, 14, 132)}
+
+        upper = {'dark pink': (191, 178, 221),
+                 'green': (94, 255, 255),
+                 'blue': (134, 255, 255),
+                 'yellow': (255, 149, 255),
+                 'orange': (255, 255, 255),
+                 'brown': (18, 190, 106),
+                 'light pink': (191, 90, 255)}
 
     # define standard colors for printed circle around the object
     colors = {'dark pink': (0, 0, 255), 'green': (0, 255, 0), 'blue': (255, 0, 0), 'yellow': (0, 255, 217),
               'orange': (0, 140, 255), 'brown': (101, 67, 33), 'light pink': (255, 192, 203)}
 
-    # An array to hold the center points of each color
+    # Array to hold the center points of each circle
     # centerPoints = [[] for i in range(12)]
-    centerPoints = {'dark pink': [] }
-        # , 'green': [], 'blue': [], 'yellow': [], 'orange': [], 'purple': [], 'pink': []}
-    
+    centerPoints = {'dark pink': [],
+                    'green': [],
+                    'blue': [],
+                    'yellow': [],
+                    'orange': [],
+                    'brown': [],
+                    'light pink': []}
+
+    # Array of all the center points for given frame
+    centerPoints_current = {'dark pink': (0, 0),
+                            'green': (0, 0),
+                            'blue': (0, 0),
+                            'yellow': (0, 0),
+                            'orange': (0, 0),
+                            'brown': (0, 0),
+                            'light pink': (0, 0)}
+
+    # Array of all the center points for previous frame
+    centerPoints_previous = {'dark pink': (0, 0),
+                             'green': (0, 0),
+                             'blue': (0, 0),
+                             'yellow': (0, 0),
+                             'orange': (0, 0),
+                             'brown': (0, 0),
+                             'light pink': (0, 0)}
 
     # grab the reference to the camera
-    camera = cv2.VideoCapture(1)  # IMPORTANT: 0 for default webcam, 1 for usb webcam
+    camera = cv2.VideoCapture(0)  # IMPORTANT: 0 for default webcam, 1 for usb webcam
     print("video received")
 
     while True:
@@ -76,67 +139,67 @@ def main():
         if not grabbed:
             break
 
-        # resize the frame, blur it, and convert it to the HSV
-        # color space
-        frame = imutils.resize(frame, width=1000)
+        frame = imutils.resize(frame, width=1000)  # resize frame
+        blurred = cv2.GaussianBlur(frame, (11, 11), 0)  # blur frame
+        hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)  # convert frame to HSV
 
-        blurred = cv2.GaussianBlur(frame, (11, 11), 0)
-        hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
+        # Store center points to new array to save previous center points
+        # This will be for calculating velocity
+        centerPoints_current = centerPoints_previous
+
         # for each color in dictionary check object in frame
         for key, value in upper.items():
-            # construct a mask for the color from dictionary`1, then perform
-            # a series of dilations and erosions to remove any small
-            # blobs left in the mask
+            # construct a mask for the color from dictionary, then perform
+            # a series of dilations and erosions to remove any small blobs left in the mask
+            # Note: I don't fully understand how this works but it works and that's what matters, right?
             kernel = np.ones((9, 9), np.uint8)
             mask = cv2.inRange(hsv, lower[key], upper[key])
             mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
             mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
-            # find contours in the mask and initialize the current
-            # (x, y) center of the ball
+            # find contours in the mask and initialize the current (x, y) center of the ball
             cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
-            # center = None
 
             # only proceed if at least one contour was found
             if len(cnts) > 0:
                 # find the largest contour in the mask, then use
-                # it to compute the minimum enclosing circle and
-                # centroid
+                # it to compute the minimum enclosing circle and centroid
                 c = max(cnts, key=cv2.contourArea)
                 ((x, y), radius) = cv2.minEnclosingCircle(c)
                 M = cv2.moments(c)
                 center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
-                # print(radius)
+                #print(radius)
 
                 # if the radius is between 40 and 60 pixels (current size about 50)
-                # removes noise from larger blobs that may appear
-                if 40 < radius < 60:
+                # This statement removes noise from larger blobs that may appear
+                # It may not be necessary when only the table appears in the frame
+                if 50 < radius < 70:
                     # draw the circle and centroid on the frame,
                     # then update the list of tracked points
                     cv2.circle(frame, (int(x), int(y)), int(radius), colors[key], 2)
-                    cv2.putText(frame, key + " ball", (int(x - radius), int(y - radius)), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
+                    cv2.putText(frame, key, (int(x - radius), int(y - radius)), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
                                 colors[key], 2)
                     # centerPoints[key].append(center)
-                    # print(centerPoints)
+                    # print(centerPoints_current)
+                else:
+                    center = (0, 0)
+            else:
+                center = (0, 0)  # If it doesn't see a color set the center (0, 0) so we know its not right
 
-                    x_cm = int(x) / conversion  # The x-center in [cm]
-                    y_cm = int(y) / conversion  # The y-center in [cm]
-                    r_cm = radius / conversion  # The radius (Not sure why, but why not) in [cm]
+            # STORING THE CENTER POINTS:
 
-                    # # Calculates the speed of the object over the last time interval
-                    # if len(centerPoints[0]) >= 1:
-                    #     previousLocation = (centerPoints[circleNum])[indexcounter - 1]
-                    #     xprevious = previousLocation[0]
-                    #     yprevious = previousLocation[1]
-                    #     distance = math.sqrt(
-                    #         (xcenter - xprevious) ** 2 + (ycenter - yprevious) ** 2)
-                    #     # Distance the circle traveled in [cm]
-                    #     interval = 1
-                    #     speed = distance / interval
+            centerPoints_current[key] = center
+            print(centerPoints_current)
 
-                # show the frame to our screen
-                cv2.imshow("Frame", frame)
-                # cv2.imshow("Mask", mask)
+            time1 = time.time()
+            # print("Timer:" + str(time1-time0))
+
+            # centerPoints[key].append(center) #  doesn't work, stores all in dark pink but I don't think that matters`
+            # print(centerPoints)
+
+            # show the frame to our screen
+            cv2.imshow("Frame", frame)
+            # cv2.imshow("Mask", mask)
 
             key = cv2.waitKey(1) & 0xFF
             # if the 'q' key is pressed, stop the loop
